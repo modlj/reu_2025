@@ -9,14 +9,14 @@ def main():
     print("--- Setting up & training agent ---")
 
     # Establish environment
-    env = GridEnv(render_mode="rgb_array")  # Use RGB array for pixel observations
+    env = GridEnv(render_mode="rgb_array")  
     env = ImgObsWrapper(env)  # Convert to pixel observations
-    env = DummyVecEnv([lambda: env])  # Wrap in a DummyVecEnv
+    env = DummyVecEnv([lambda: env]) 
     env = VecMonitor(env)  # Monitor the environment for logging
 
     # RL agent instantiation
     model = DQN(
-        "CnnPolicy",  # Use CnnPolicy for pixel observations
+        "CnnPolicy",  
         env,
         learning_rate=1e-4,
         buffer_size=10000,
@@ -34,7 +34,7 @@ def main():
 
     # Agent training
     print("Starting training...")
-    model.learn(total_timesteps=100000)  # Train for 100,000 timesteps
+    model.learn(total_timesteps=100000)  
     print("Training finished!")
 
     # Training eval
