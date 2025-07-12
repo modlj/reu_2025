@@ -22,9 +22,9 @@ class GridEnv(MiniGridEnv):
         self.agent_start_dir = agent_start_dir
 
         
-        mission_space = MissionSpace(mission_func=lambda: "")
+        mission_space = MissionSpace(mission_func=lambda: "Exploration")
 
-        # Max steps
+        
         if max_steps is None:
             max_steps = 4 * size**2
 
@@ -41,15 +41,14 @@ class GridEnv(MiniGridEnv):
         self.grid = Grid(width, height)
         self.grid.wall_rect(0, 0, width, height)
         self.place_agent()
-        self.mission = "Explore the grid"
+        self.mission = "Exploration"
 
 
 
 # Independent environment test
-
 if __name__ == "__main__":
-    print("Testing BareBonesGridEnv directly...")
+    print("Testing GridEnv directly...")
     env = GridEnv(render_mode="human")
     manual_control = ManualControl(env, seed=42)
     manual_control.start()
-    print("Environment test finished.")
+    print("GridEnv test finished.")
