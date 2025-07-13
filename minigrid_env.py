@@ -75,22 +75,10 @@ class GridEnv(MiniGridEnv):
 
             # Increment visit count for the current position
             self.visit_counts[current_pos_x, current_pos_y] += 1
-
-            # Calculate intrinsic reward based on visit count
-            # A common approach: inverse square root of the visit count
-            # Add a small constant (e.g., 1) to avoid division by zero and make first visit 1.0
             intrinsic_reward = 1.0 / np.sqrt(self.visit_counts[current_pos_x, current_pos_y])
-            
-            # Add intrinsic reward to the total reward
             reward += intrinsic_reward
-            # Optionally, you might want to log the intrinsic reward in info
             info['intrinsic_reward'] = intrinsic_reward
-
         return obs, reward, terminated, truncated, info
-
-
-
-
 
     def _gen_grid(self, width, height):
         print("--- _gen_grid: Started ---") 
