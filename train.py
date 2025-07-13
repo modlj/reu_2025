@@ -72,8 +72,13 @@ def main():
 
     # Agent training
     print("Starting training...")
-    model.learn(total_timesteps=100000)  
+    total_timesteps = 1000000
+    model.learn(total_timesteps=total_timesteps)  
     print("Training finished!")
+
+    # Save the trained model
+    model.save("dqn_minigrid_model")
+    print("Model saved as 'dqn_minigrid_model.zip'")
 
     # Training eval
     print(" --- Evaluating trained agent ---")

@@ -32,11 +32,12 @@ class RoomBall(Ball):
 class GridEnv(MiniGridEnv):
     def __init__(
         self,
-        size=10,
+        size=10, # 8 x 8
         agent_start_pos=None, # Agent placed randomly
         agent_start_dir=3, 
         max_steps: int | None = None,
         agent_view_size=3,
+        enable_intrinsic_reward = False,
         **kwargs,
     ):
         self.agent_start_pos = agent_start_pos
@@ -57,11 +58,44 @@ class GridEnv(MiniGridEnv):
             agent_view_size=agent_view_size,
             **kwargs,
         )
+        self.enable_intrinsic_reward = enable_intrinsic_reward
+        self.visit_counts = np.zeros((self.width, self.height), dtype=np.int32)
+
+    def reset(self, seed=None, options=None):
+        obs, info = super().reset(seed=seed, options=options)
+        self.visit_counts = np.zeros((self.width, self.height), dtype=np.int32)
+        self.visit_counts[self.agent_pos[0], self.agent_pos[1]] += 1
+        return obs, info
+    
+    def step(self, action):
+        obs, reward, terminated, truncated, info = super().step(action)
+        if self.enable_intrinsic_reward:
+            # Get current agent position after the step
+            current_pos_x, current_pos_y = self.agent_pos
+
+            # Increment visit count for the current position
+            self.visit_counts[current_pos_x, current_pos_y] += 1
+
+            # Calculate intrinsic reward based on visit count
+            # A common approach: inverse square root of the visit count
+            # Add a small constant (e.g., 1) to avoid division by zero and make first visit 1.0
+            intrinsic_reward = 1.0 / np.sqrt(self.visit_counts[current_pos_x, current_pos_y])
+            
+            # Add intrinsic reward to the total reward
+            reward += intrinsic_reward
+            # Optionally, you might want to log the intrinsic reward in info
+            info['intrinsic_reward'] = intrinsic_reward
+
+        return obs, reward, terminated, truncated, info
+
+
+
+
 
     def _gen_grid(self, width, height):
         print("--- _gen_grid: Started ---") 
         self.grid = Grid(width, height)
-        print(f"--- _gen_grid: Grid initialized: {width}x{height} ---") 
+        #print(f"--- _gen_grid: Grid initialized: {width}x{height} ---") 
         self.grid.wall_rect(0, 0, width, height)
         print("--- _gen_grid: Walls added ---") 
         
