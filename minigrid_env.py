@@ -1,3 +1,7 @@
+# iEdge 2025 REU
+# General code flow and structure based on Vice et al. (https://github.com/jackvice/lstm_explore)
+
+
 from __future__ import annotations
 
 import numpy as np

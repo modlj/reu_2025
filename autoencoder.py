@@ -1,3 +1,6 @@
+# iEdge 2025 REU
+# Autoencoder flow and structure based on Vice et al. (https://github.com/jackvice/lstm_explore)
+
 import torch
 import torch.nn as nn
 from skimage.metrics import structural_similarity as ssim
