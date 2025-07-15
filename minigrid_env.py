@@ -36,11 +36,11 @@ class RoomBall(Ball):
 class GridEnv(MiniGridEnv):
     def __init__(
         self,
-        size=10, # 8 x 8
+        size=15, # 13 X 13
         agent_start_pos=None, # Agent placed randomly
         agent_start_dir=3, 
         max_steps: int | None = None,
-        agent_view_size=3,
+        agent_view_size=9,
         enable_intrinsic_reward = False,
         **kwargs,
     ):
