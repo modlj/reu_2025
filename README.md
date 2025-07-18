@@ -1,2 +1,2 @@
-# 2025 Mississippi State University Intelligent Edge REU
-Working title: *Intrinsic Curiosity-Driven Exploration in Visually-Rich 2D Gridworlds using Autoencoder Novelty*
+# 2025 Intelligent Edge Computing Systems REU (MS State)
+*Intrinsic Curiosity-Driven Exploration in a Visually-Rich 2D Gridworld*
