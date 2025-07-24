@@ -48,7 +48,7 @@ class Autoencoder(nn.Module):
         return reconstructed
 
 def compute_ssim(img1_np, img2_np, data_range=1.0):
-    # Ensure both images have the same dimensions
+    # Ensure both images have the same dimensions and are 2D or 3D (H, W) or (H, W, C)
     # skimage ssim expects float values
     img1_np = img1_np.astype(float)
     img2_np = img2_np.astype(float)

@@ -6,6 +6,7 @@
 
 
 from __future__ import annotations
+from gymnasium.envs.registration import register
 import numpy as np
 import random
 # Import Box from minigrid.core.world_object
@@ -20,20 +21,20 @@ class CustomEmpty(WorldObj):
     def __init__(self, color: str, states = None):
         super().__init__("empty",color)
         self.contains = None
-        self.can_overlap = lambda: True
+        self.can_overlap = lambda: False
     
 
 
 class RoomBall(Ball):
     def __init__(self, color: str, states=None):
         super().__init__(color)
-        self.can_overlap = lambda: False # Agent cannot go over circles
+        self.can_overlap = lambda: False 
 
 
 class RoomSquare(Box): 
     def __init__(self, color: str, states=None):
         super().__init__(color) 
-        self.can_overlap = lambda: False # Agent cannot go over squares
+        self.can_overlap = lambda: False 
     
 
 
@@ -75,7 +76,7 @@ class GridEnv(MiniGridEnv):
         self.grid.wall_rect(0, 0, width, height) # Outer walls
 
         
-        # 27x27 grid (25 x 25 with padding)
+        
         hallway_width = 3
         room_depth = (height - 2 - hallway_width) // 2
         room_width = (width - 2 - hallway_width) // 2
@@ -135,27 +136,37 @@ class GridEnv(MiniGridEnv):
 
         # Place colored circles and squares randomly in each of the rooms
         # Helper function to place objects in a given rectangular region
-        def place_objects_in_room(x_min, y_min, x_max, y_max, density=0.1):
+        def place_objects_in_room(x_min, y_min, x_max, y_max, num_objects=5):
             object_types = [RoomBall, RoomSquare]
             novel_colors = [c for c in COLOR_NAMES if c not in ['black', 'white', 'grey']]
 
-            # Ensure there are valid coordinates to place objects
-            if x_min >= x_max or y_min >= y_max:
-                return
-
-            for x in range(x_min + 1, x_max): # +1 and -1 to avoid walls
+            valid_positions = []
+            for x in range(x_min + 1, x_max):
                 for y in range(y_min + 1, y_max):
-                    if self.grid.get(x, y) is None and random.random() < density:
-                        obj_type = random.choice(object_types)
-                        obj_color = random.choice(novel_colors)
-                        self.grid.set(x, y, obj_type(obj_color))
+                    if self.grid.get(x, y) is None: # Cell is empty
+                        valid_positions.append((x, y))
+
+            if not valid_positions:
+                return # No place to put objects
+            
+            num_to_place = min(num_objects, len(valid_positions)) 
+            placements = random.sample(valid_positions, num_to_place)
+            
+            # Ensure there are valid coordinates to place objects
+            # if x_min >= x_max or y_min >= y_max:
+                # return
+
+            for pos in placements:
+                obj_type = random.choice(object_types)
+                obj_color = random.choice(novel_colors)
+                self.grid.set(pos[0], pos[1], obj_type(obj_color))
 
 
         # Place objects in each defined room area
-        place_objects_in_room(room1_x_start, room1_y_start, room1_x_end, room1_y_end, density=0.08)
-        place_objects_in_room(room2_x_start, room2_y_start, room2_x_end, room2_y_end, density=0.08)
-        place_objects_in_room(room3_x_start, room3_y_start, room3_x_end, room3_y_end, density=0.08)
-        place_objects_in_room(room4_x_start, room4_y_start, room4_x_end, room4_y_end, density=0.08)
+        place_objects_in_room(room1_x_start, room1_y_start, room1_x_end, room1_y_end, num_objects=5)
+        place_objects_in_room(room2_x_start, room2_y_start, room2_x_end, room2_y_end, num_objects=5)
+        place_objects_in_room(room3_x_start, room3_y_start, room3_x_end, room3_y_end, num_objects=5)
+        place_objects_in_room(room4_x_start, room4_y_start, room4_x_end, room4_y_end, num_objects=5)
 
 
         # Place agent randomly within the central hallway
@@ -172,6 +183,23 @@ class GridEnv(MiniGridEnv):
         self.agent_start_pos = random.choice(hallway_cells)
         self.place_agent()
         self.mission = "Explore all rooms"
+
+        # Calculate the true number of navigable cells after generation
+        self.num_navigable_cells = 0
+        for x in range(width):
+            for y in range(height):
+                cell = self.grid.get(x, y)
+                # A cell is navigable if it's empty.
+                if cell is None:
+                    self.num_navigable_cells += 1
+                
+
+
+
+register(
+    id='MiniGrid-Custom-Grid-v0',
+    entry_point='minigrid_env:GridEnv',
+)
 
 
 # Independent environment testing

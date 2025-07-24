@@ -4,6 +4,8 @@ import torch
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
+from gymnasium.envs.registration import register
+import minigrid_env
 from minigrid_env import GridEnv
 from minigrid.wrappers import ImgObsWrapper # For pixel observations
 from stable_baselines3 import DQN
@@ -15,6 +17,8 @@ from autoencoder import Autoencoder
 from im_wrapper import AutoencoderWrapper
 import argparse
 import random
+import os
+from torch.utils.tensorboard import SummaryWriter
 
 # Custom CNN necessary for DQN integration in MiniGrid
 class GridCNN(BaseFeaturesExtractor):
@@ -64,7 +68,7 @@ class AutoencoderTrainCallback(BaseCallback):
          
     def _on_step(self) -> bool:
         # Collect current observation
-        current_obs = self.locals['new_obs'][0] 
+        current_obs = self.locals['new_obs'][0] # Assuming single environment in DummyVecEnv
         self.buffer.append(current_obs)
         self.total_steps += 1
         # Periodically train CAE
@@ -72,12 +76,18 @@ class AutoencoderTrainCallback(BaseCallback):
             self._train_autoencoder()
         
         # Log exploration metrics
-        self._log_exploration_metrics()
+        # self._log_exploration_metrics()
+        percentage_visited = self._log_exploration_metrics() # Have this function return the value
+
+        # Check for cutoff condition
+        if percentage_visited is not None and percentage_visited >= 100.0:
+            print(f"Stopping training: 100% exploration reached at step {self.total_steps}.")
+            return False # This will stop the model.learn() loop
         
         return True
-    
-    
-    def _log_exploration_metrics(self):
+
+
+    def _log_exploration_metrics(self) -> float:
         # Access the original environment to get visit_counts
         # self.training_env is VecEnv
         
@@ -86,7 +96,12 @@ class AutoencoderTrainCallback(BaseCallback):
         
         
         num_visited_cells = np.sum(visit_counts > 0)
-        total_navigable_cells = (self.training_env.get_attr('width')[0] - 2) *                                 (self.training_env.get_attr('height')[0] - 2)
+        
+        
+        total_navigable_cells = self.training_env.get_attr('num_navigable_cells')[0]
+        
+        
+        # total_navigable_cells = (self.training_env.get_attr('width')[0] - 2) * (self.training_env.get_attr('height')[0] - 2)
         
         if total_navigable_cells > 0:
             percentage_visited = (num_visited_cells / total_navigable_cells) * 100
@@ -101,20 +116,33 @@ class AutoencoderTrainCallback(BaseCallback):
             self.logger.record("exploration/percentage_visited_cells", percentage_visited)
             self.logger.record("exploration/num_visited_cells", num_visited_cells)
             self.logger.record("exploration/total_navigable_cells", total_navigable_cells)
-            # Log AE loss and SSIM score if not already covered by VecMonitor for intrinsic_reward
-            # Check if 'infos' exists in self.locals and if it contains the expected keys
-            if 'infos' in self.locals and self.locals['infos'] and                'ssim_score' in self.locals['infos'][0] and 'intrinsic_reward' in self.locals['infos'][0]:
+            
+            if 'infos' in self.locals and self.locals['infos'] and 'ssim_score' in self.locals['infos'][0] and 'intrinsic_reward' in self.locals['infos'][0]:
                  self.logger.record("metrics/ssim_score", self.locals['infos'][0]['ssim_score'])
                  self.logger.record("metrics/intrinsic_reward", self.locals['infos'][0]['intrinsic_reward'])
-
+        return percentage_visited
 
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def _train_autoencoder(self):
         # Sample batch from buffer
         indices = np.random.choice(len(self.buffer), self.batch_size, replace = False)
         batch_obs = [self.buffer[i] for i in indices]
         
-        
+        # Debugging prints:
         print(f"Shape of one sample in batch_obs (H, W, C): {batch_obs[0].shape}") 
         
         obs_np_array = np.array(batch_obs)
@@ -144,6 +172,56 @@ def get_args():
                         help="Random seed for reproducibility")
     return parser.parse_args()
 
+def random_exploration(total_timesteps = 1000000):
+    print("Running Random Exploration Baseline...")
+    env = gym.make('MiniGrid-Custom-Grid-v0', size=27)
+    current_timesteps = 0
+    visited_cells = set()
+    initial_obs, info = env.reset()
+    total_navigable_cells = env.unwrapped.num_navigable_cells
+    print(f"Total navigable cells: {total_navigable_cells}")
+
+    log_dir = "./logs/random_exploration/"
+    os.makedirs(log_dir, exist_ok=True)
+    writer = SummaryWriter(log_dir)
+
+    obs = env.reset()
+    episode_rewards = 0
+    num_episodes = 0
+
+    for step in range(total_timesteps):
+        action = env.action_space.sample()  # Take a random action
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
+        episode_rewards += reward
+
+        # Calculate visited percentage using the correct total
+        visit_counts = env.unwrapped.visit_counts
+        num_visited_cells = np.sum(visit_counts > 0)
+        
+        # 2. Use the correct denominator in the calculation
+        if total_navigable_cells > 0:
+            percentage_visited = (num_visited_cells / total_navigable_cells) * 100
+        else:
+            percentage_visited = 0.0
+
+        writer.add_scalar("exploration/percentage_visited_cells", percentage_visited, step)
+        
+        if done:
+            obs = env.reset()
+            writer.add_scalar("rollout/ep_rew_mean", episode_rewards, num_episodes)
+            num_episodes += 1
+            episode_rewards = 0
+            # Optional: Add a cutoff for random exploration as well
+            if percentage_visited >= 100:
+                print(f"Random exploration reached 100% at step {step}. Stopping.")
+                break
+
+    writer.close()
+    env.close()
+    print("Finished random exploration.")
+
+
 
 
 def main():
@@ -169,8 +247,8 @@ def main():
 
     env_kwargs = {"render_mode": "rgb_array", "enable_intrinsic_reward": False}
 
-    if args.mode == "count_based_curiosity":
-        env_kwargs["enable_intrinsic_reward"] = True
+    # if args.mode == "count_based_curiosity":
+    #     env_kwargs["enable_intrinsic_reward"] = True
 
     env = GridEnv(**env_kwargs)
     env = ImgObsWrapper(env)
@@ -210,24 +288,25 @@ def main():
     env = VecMonitor(env, log_dir) # Log training progress
 
     if args.mode == "random_exploration":
-        print("Running Random Exploration Baseline...")
-        # Simulate training loop for logging
-        obs = env.reset()[0]
-        for step in range(args.total_timesteps):
-            action = [env.action_space.sample()] # Take a random action
-            obs, reward, dones, info = env.step(action)
-            done = dones[0]
-            if step % 500 == 0: 
-                # visit_counts obtained from original GridEnv
-                visit_counts = env.get_attr('visit_counts')[0]
-                num_visited_cells = np.sum(visit_counts > 0)
-                total_navigable_cells = (env.get_attr('width')[0] - 2) *                                         (env.get_attr('height')[0] - 2)
-                percentage_visited = (num_visited_cells / total_navigable_cells) * 100 if total_navigable_cells > 0 else 0.0
-                print(f"Random Step {step}: Visited {num_visited_cells}/{total_navigable_cells} cells ({percentage_visited:.2f}%)")
+        random_exploration(args.total_timesteps)
+        # print("Running Random Exploration Baseline...")
+        # # Simulate training loop for logging
+        # obs = env.reset()[0]
+        # for step in range(args.total_timesteps):
+        #     action = [env.action_space.sample()] # Take a random action
+        #     obs, reward, dones, info = env.step(action)
+        #     done = dones[0]
+        #     if step % 500 == 0: 
+        #         # visit_counts obtained from original GridEnv
+        #         visit_counts = env.get_attr('visit_counts')[0]
+        #         num_visited_cells = np.sum(visit_counts > 0)
+        #         total_navigable_cells = (env.get_attr('width')[0] - 2) *                                         (env.get_attr('height')[0] - 2)
+        #         percentage_visited = (num_visited_cells / total_navigable_cells) * 100 if total_navigable_cells > 0 else 0.0
+        #         print(f"Random Step {step}: Visited {num_visited_cells}/{total_navigable_cells} cells ({percentage_visited:.2f}%)")
 
-            if done:
-                obs = env.reset()[0]
-        print("Random Exploration finished!")
+        #     if done:
+        #         obs = env.reset()[0]
+        # print("Random Exploration finished!")
 
     else: # autoencoder_curiosity or count_based_curiosity
         model_name = f"dqn_minigrid_{args.mode}_seed{args.seed}"
@@ -243,7 +322,7 @@ def main():
             gamma=0.99,
             train_freq=4,
             gradient_steps=1,
-            exploration_fraction=0.05, # Can set lower for intrinsic
+            exploration_fraction=0.05, # Can set lower for intrinsic, or adapt for specific needs
             exploration_final_eps=0.01, # Or remove if intrinsic reward is the ONLY driver
             verbose=1,
             device=device,
