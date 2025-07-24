@@ -158,6 +158,8 @@ class AutoencoderTrainCallback(BaseCallback):
         loss = self.loss_fn(reconstructed_obs, obs_tensor)
         loss.backward()
         self.optimizer.step()
+        if self.logger:
+            self.logger.record("train/cae_loss", loss.item())
         if self.verbose > 0:
             print(f"Autoencoder trained at step {self.total_steps}, Loss: {loss.item():.4f}")
 
@@ -339,8 +341,8 @@ def main():
         print(f"Model saved as '{model_name}.zip'")
 
     # Evaluation
-    print(" --- Basic Evaluation (render_mode='human') ---")
-    eval_env = GridEnv(render_mode="human")
+    print(" --- Basic Evaluation (headless mode) ---")
+    eval_env = GridEnv(render_mode="rgb_array")
     eval_env = ImgObsWrapper(eval_env)
     
     # Evaluating trained agent --> load it
