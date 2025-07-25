@@ -339,7 +339,7 @@ def main():
         print("Training finished!")
         model.save(model_name)
         print(f"Model saved as '{model_name}.zip'")
-
+        SummaryWriter(log_dir).close()
     # Evaluation
     print(" --- Basic Evaluation (headless mode) ---")
     eval_env = GridEnv(render_mode="rgb_array")
