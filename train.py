@@ -339,7 +339,7 @@ def main():
         print("Training finished!")
         model.save(model_name)
         print(f"Model saved as '{model_name}.zip'")
-        SummaryWriter(log_dir).close()
+        # SummaryWriter(log_dir).close()
     # Evaluation
     print(" --- Basic Evaluation (headless mode) ---")
     eval_env = GridEnv(render_mode="rgb_array")
@@ -366,6 +366,7 @@ def main():
             if done:
                 print(f"Episode {episode + 1} finished (mode: {args.mode})")
                 obs, info = eval_env.reset()
+    SummaryWriter(log_dir).close()
     eval_env.close()
 
 if __name__ == "__main__":
